@@ -1,0 +1,133 @@
+// == PRISMA SCHEMA == //
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+}
+
+enum MessageChannel {
+  WHATSAPP
+  SMS
+}
+
+enum MessageStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+
+  businesses BusinessMember[]
+}
+
+model Business {
+  id        String   @id @default(uuid())
+  name      String
+  currency  String
+  country   String
+  createdAt DateTime @default(now())
+
+  members     BusinessMember[]
+  customers   Customer[]
+  transactions Transaction[]
+  invoices    Invoice[]
+  messages    Message[]
+}
+
+model BusinessMember {
+  id         String   @id @default(uuid())
+  userId     String
+  businessId String
+  role       String   // OWNER | STAFF
+
+  user     User     @relation(fields: [userId], references: [id])
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@unique([userId, businessId])
+}
+
+model Customer {
+  id         String   @id @default(uuid())
+  businessId String
+  name       String
+  phone      String
+  createdAt  DateTime @default(now())
+
+  business Business @relation(fields: [businessId], references: [id])
+  invoices Invoice[]
+  transactions Transaction[]
+}
+
+model Transaction {
+  id              String             @id @default(uuid())
+  businessId      String
+  type            TransactionType
+  status          TransactionStatus @default(COMPLETED)
+  amount          Float
+  currency        String
+  categoryId      String?
+  customerId      String?
+  reference       String?
+  transactionDate DateTime
+  createdBy       String
+  createdAt       DateTime          @default(now())
+  isDeleted       Boolean           @default(false)
+
+  business  Business  @relation(fields: [businessId], references: [id])
+  customer  Customer? @relation(fields: [customerId], references: [id])
+}
+
+model Invoice {
+  id          String        @id @default(uuid())
+  businessId  String
+  customerId  String
+  status      InvoiceStatus @default(DRAFT)
+  totalAmount Float
+  dueDate     DateTime
+  issuedDate  DateTime
+  createdAt   DateTime      @default(now())
+
+  business Business @relation(fields: [businessId], references: [id])
+  customer Customer @relation(fields: [customerId], references: [id])
+}
+
+model Message {
+  id             String         @id @default(uuid())
+  businessId     String
+  channel        MessageChannel
+  recipientPhone String
+  messageBody    String
+  status         MessageStatus  @default(PENDING)
+  referenceType  String?
+  referenceId    String?
+  createdAt      DateTime       @default(now())
+
+  business Business @relation(fields: [businessId], references: [id])
+}

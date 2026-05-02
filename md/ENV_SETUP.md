@@ -17,7 +17,7 @@ This project uses environment-specific configuration files for different deploym
 cp .env.dev .env
 
 # Start development server
-pnpm start:dev
+npm run start:dev
 ```
 
 ### Staging
@@ -26,8 +26,8 @@ pnpm start:dev
 cp .env.staging .env
 
 # Build and start
-pnpm build
-pnpm start:prod
+npm run build
+npm run start:prod
 ```
 
 ### Production
@@ -36,8 +36,8 @@ pnpm start:prod
 cp .env.prod .env
 
 # Build and start
-pnpm build
-pnpm start:prod
+npm run build
+npm run start:prod
 ```
 
 ## Environment Variables
@@ -88,7 +88,7 @@ pnpm start:prod
 
 3. Run the application:
    ```bash
-   pnpm start:dev
+   npm run start:dev
    ```
 
 ## CI/CD Integration

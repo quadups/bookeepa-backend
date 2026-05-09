@@ -1,0 +1,11 @@
+import { Module } from '@nestjs/common';
+import { BillingModule } from '../billing/billing.module';
+import { MessagesController } from './messages.controller';
+import { MessagesService } from './messages.service';
+
+@Module({
+  imports: [BillingModule],
+  controllers: [MessagesController],
+  providers: [MessagesService],
+})
+export class MessagesModule {}

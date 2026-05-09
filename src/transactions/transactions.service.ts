@@ -5,6 +5,14 @@ import {
   Transaction,
   TransactionType,
 } from '@prisma/client';
+import {
+  PaginatedResult,
+  resolvePageLimit,
+  toPaginatedResult,
+} from '../common/dto/pagination.dto';
+import { EntitlementsService } from '../billing/entitlements.service';
+import { FEATURE_CODES } from '../billing/feature-codes';
+import { IdempotencyService } from '../common/idempotency/idempotency.service';
 import { TenancyService } from '../common/tenancy/tenancy.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
@@ -16,9 +24,29 @@ export class TransactionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tenancyService: TenancyService,
+    private readonly idempotencyService: IdempotencyService,
+    private readonly entitlementsService: EntitlementsService,
   ) {}
 
-  async create(userId: string, dto: CreateTransactionDto): Promise<Transaction> {
+  async create(
+    userId: string,
+    dto: CreateTransactionDto,
+    idempotencyKey?: string,
+  ): Promise<Transaction> {
+    return this.idempotencyService.run({
+      userId,
+      businessId: dto.businessId,
+      key: idempotencyKey,
+      route: 'POST /api/v1/transactions',
+      requestBody: dto,
+      handler: () => this.createTransaction(userId, dto),
+    });
+  }
+
+  private async createTransaction(
+    userId: string,
+    dto: CreateTransactionDto,
+  ): Promise<Transaction> {
     const business = await this.tenancyService.assertBusinessAccess(
       userId,
       dto.businessId,
@@ -26,8 +54,13 @@ export class TransactionsService {
     const currency = this.resolveCurrency(dto.currency, business.currency);
 
     await this.validateReferences(dto.businessId, dto.type, dto);
+    await this.entitlementsService.assertWithinQuota(
+      dto.businessId,
+      FEATURE_CODES.TRANSACTIONS,
+      1,
+    );
 
-    return this.prisma.transaction.create({
+    const transaction = await this.prisma.transaction.create({
       data: {
         businessId: dto.businessId,
         type: dto.type,
@@ -47,12 +80,24 @@ export class TransactionsService {
         createdById: userId,
       },
     });
+
+    await this.entitlementsService.recordUsage(
+      dto.businessId,
+      FEATURE_CODES.TRANSACTIONS,
+      1,
+    );
+
+    return transaction;
   }
 
-  async list(userId: string, query: TransactionQueryDto): Promise<Transaction[]> {
+  async list(
+    userId: string,
+    query: TransactionQueryDto,
+  ): Promise<PaginatedResult<Transaction>> {
     await this.tenancyService.assertBusinessMember(userId, query.businessId);
+    const limit = resolvePageLimit(query.limit);
 
-    return this.prisma.transaction.findMany({
+    const transactions = await this.prisma.transaction.findMany({
       where: {
         businessId: query.businessId,
         isDeleted: false,
@@ -63,9 +108,13 @@ export class TransactionsService {
           lte: query.to ? new Date(query.to) : undefined,
         },
       },
-      orderBy: { transactionDate: 'desc' },
-      take: 100,
+      orderBy: [{ transactionDate: 'desc' }, { id: 'desc' }],
+      cursor: query.cursor ? { id: query.cursor } : undefined,
+      skip: query.cursor ? 1 : 0,
+      take: limit + 1,
     });
+
+    return toPaginatedResult(transactions, limit);
   }
 
   async get(userId: string, transactionId: string): Promise<Transaction> {

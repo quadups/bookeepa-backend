@@ -9,6 +9,7 @@ Production-oriented NestJS API for Bookepa, an Africa-first bookkeeping, debt tr
 - PostgreSQL
 - Jest and Supertest
 - Swagger/OpenAPI at `/api/docs` outside production, or when `ENABLE_SWAGGER=true`
+- Versioned API under `/api/v1`
 
 ## Local Setup
 
@@ -21,7 +22,7 @@ npm run db:seed
 npm run start:dev
 ```
 
-The API runs at `http://localhost:3000/api` by default.
+The API runs at `http://localhost:3000/api/v1` by default.
 
 ## Key Commands
 
@@ -33,6 +34,7 @@ npm run test:e2e
 npm run prisma:validate
 npm run prisma:migrate:dev
 npm run db:seed
+npm run openapi:generate
 ```
 
 ## Architecture Docs
@@ -45,6 +47,8 @@ Project decisions and conventions live in [`md/`](./md):
 - [`md/TESTING.md`](./md/TESTING.md)
 - [`md/adr/0001-modular-nestjs-prisma.md`](./md/adr/0001-modular-nestjs-prisma.md)
 - [`md/adr/0002-business-scoped-geo-pricing.md`](./md/adr/0002-business-scoped-geo-pricing.md)
+- [`md/adr/0003-mobile-api-contract.md`](./md/adr/0003-mobile-api-contract.md)
+- [`md/adr/0004-plan-entitlements.md`](./md/adr/0004-plan-entitlements.md)
 
 ## Current MVP Surface
 
@@ -57,6 +61,11 @@ Project decisions and conventions live in [`md/`](./md):
 - Manual message logging
 - Computed dashboard totals
 - Public pricing metadata
+- Refresh-token sessions for mobile apps
+- Cursor pagination for mobile list screens
+- Idempotent transaction creation for retry-safe mobile networks
+- Plan entitlements and usage limits for feature gating
+- Generated OpenAPI contract at `openapi/bookepa-api.v1.json`
 
 ## Engineering Notes
 
@@ -64,4 +73,6 @@ Project decisions and conventions live in [`md/`](./md):
 - Tenant access is business-scoped and enforced in services through `TenancyService`.
 - Transactions are soft-deleted to preserve auditability.
 - Dashboard totals are computed from completed, non-deleted transactions.
+- API v1 is treated as a mobile contract; breaking changes should go into a new version.
+- Plan checks are centralized through `EntitlementsService`; product modules should never branch on plan names directly.
 - Real WhatsApp sending, payments, wallet deductions, fraud automation, and AI insights are intentionally left as future domains.

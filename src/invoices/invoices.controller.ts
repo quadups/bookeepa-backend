@@ -2,11 +2,13 @@ import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
-  ApiOkResponse,
   ApiOperation,
   ApiTags,
+  ApiOkResponse,
 } from '@nestjs/swagger';
+import { ApiPaginatedResponse } from '../common/decorators/api-paginated-response.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { PaginatedResult } from '../common/dto/pagination.dto';
 import type { RequestUser } from '../common/types/request-user';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { InvoiceResponseDto } from './dto/invoice-response.dto';
@@ -32,11 +34,11 @@ export class InvoicesController {
 
   @Get()
   @ApiOperation({ summary: 'List invoices for a business' })
-  @ApiOkResponse({ type: InvoiceResponseDto, isArray: true })
+  @ApiPaginatedResponse(InvoiceResponseDto)
   list(
     @CurrentUser() user: RequestUser,
     @Query() query: InvoiceQueryDto,
-  ): Promise<InvoiceWithItems[]> {
+  ): Promise<PaginatedResult<InvoiceWithItems>> {
     return this.invoicesService.list(user.id, query);
   }
 

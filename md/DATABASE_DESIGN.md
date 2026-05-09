@@ -26,8 +26,20 @@
 - `CountryPricing`
 - `Subscription`
 - `Usage`
+- `Feature`
+- `PlanEntitlement`
+- `AuthSession`
+- `IdempotencyKey`
 
 Pricing is business-level, not user-level. This supports accountants or owners who manage multiple businesses in different countries.
+
+Feature access is plan-entitlement based:
+
+- `Feature` defines a product capability using a stable string code.
+- `PlanEntitlement` defines whether a plan enables that feature and whether it has a quota.
+- `Usage` records consumption for quota-backed features.
+
+Business logic should ask the entitlement service whether a business can use a feature. It should not branch directly on `PlanCode`.
 
 ## Transaction Model
 
@@ -60,4 +72,21 @@ The business creation flow resolves pricing from the selected country and locks 
 
 ## Future Tables
 
-The schema already leaves room for suppliers, payment methods, usage, subscriptions, and activity logs. Wallets, webhook events, real payment links, attachments, automation rules, insights, and lending records should be added when those product capabilities enter scope.
+The schema already leaves room for suppliers, payment methods, usage, subscriptions, activity logs, auth sessions, and idempotent mobile writes. Wallets, webhook events, real payment links, attachments, automation rules, insights, and lending records should be added when those product capabilities enter scope.
+
+## Mobile-Specific Tables
+
+`AuthSession` stores hashed refresh tokens and session metadata. This supports mobile login persistence, token rotation, and server-side revocation.
+
+`IdempotencyKey` stores the request hash and response body for retry-safe writes. This matters most for transaction creation because mobile networks often retry after timeouts.
+
+## Entitlement Enforcement
+
+Initial enforced MVP features:
+
+- `CUSTOMERS`
+- `TRANSACTIONS`
+- `INVOICES`
+- `MANUAL_REMINDERS`
+
+Future features can be added by inserting a `Feature`, attaching `PlanEntitlement` rows to plans, and checking that feature code at the product boundary.

@@ -1,5 +1,5 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { createHmac, timingSafeEqual } from 'crypto';
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'crypto';
 import { AppConfigService } from '../config/config.service';
 
 export interface AuthTokenPayload {
@@ -22,6 +22,14 @@ export class TokenService {
     const signature = this.sign(`${header}.${body}`);
 
     return `${header}.${body}.${signature}`;
+  }
+
+  generateRefreshToken(): string {
+    return randomBytes(48).toString('base64url');
+  }
+
+  hashRefreshToken(token: string): string {
+    return createHash('sha256').update(token).digest('hex');
   }
 
   verifyAccessToken(token: string): AuthTokenPayload {

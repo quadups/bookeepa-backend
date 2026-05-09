@@ -87,6 +87,18 @@ enum SubscriptionStatus {
   EXPIRED
 }
 
+enum EntitlementPeriod {
+  MONTHLY
+  YEARLY
+  LIFETIME
+}
+
+enum EntitlementEnforcement {
+  BLOCK
+  WARN
+  ALLOW_OVERAGE
+}
+
 model User {
   id           String    @id @default(uuid())
   email        String    @unique
@@ -105,6 +117,8 @@ model User {
   createdTransactions Transaction[]    @relation("TransactionCreator")
   createdInvoices     Invoice[]        @relation("InvoiceCreator")
   createdMessages     Message[]        @relation("MessageCreator")
+  authSessions        AuthSession[]
+  idempotencyKeys     IdempotencyKey[]
   activityLogs        ActivityLog[]
 
   @@index([phone])
@@ -136,6 +150,7 @@ model Business {
   messages       Message[]
   subscriptions  Subscription[]
   usageRecords   Usage[]
+  idempotencyKeys IdempotencyKey[]
   activityLogs   ActivityLog[]
 
   @@index([ownerId])
@@ -156,6 +171,23 @@ model BusinessMember {
 
   @@unique([businessId, userId])
   @@index([userId])
+}
+
+model AuthSession {
+  id               String    @id @default(uuid())
+  userId           String
+  refreshTokenHash String    @unique
+  userAgent        String?
+  ipAddress        String?
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
 }
 
 model Customer {
@@ -345,9 +377,40 @@ model PricingPlan {
   updatedAt       DateTime          @updatedAt
 
   subscriptions Subscription[]
+  entitlements  PlanEntitlement[]
 
   @@unique([code, regionTier, billingInterval])
   @@index([regionTier, isActive])
+}
+
+model Feature {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  entitlements PlanEntitlement[]
+}
+
+model PlanEntitlement {
+  id          String                 @id @default(uuid())
+  planId      String
+  featureCode String
+  enabled     Boolean                @default(true)
+  limit       Int?
+  period      EntitlementPeriod?
+  enforcement EntitlementEnforcement @default(BLOCK)
+  metadata    Json?
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+
+  plan    PricingPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  feature Feature     @relation(fields: [featureCode], references: [code], onDelete: Restrict)
+
+  @@unique([planId, featureCode])
+  @@index([featureCode])
 }
 
 model CountryPricing {
@@ -411,4 +474,25 @@ model ActivityLog {
 
   @@index([businessId, createdAt])
   @@index([entityType, entityId])
+}
+
+model IdempotencyKey {
+  id           String   @id @default(uuid())
+  userId       String
+  businessId   String?
+  key          String
+  route        String
+  requestHash  String
+  responseBody Json
+  statusCode   Int
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  business Business? @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, route, key])
+  @@index([businessId])
+  @@index([expiresAt])
 }

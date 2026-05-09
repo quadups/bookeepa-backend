@@ -7,7 +7,9 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { Customer } from '@prisma/client';
+import { ApiPaginatedResponse } from '../common/decorators/api-paginated-response.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { PaginatedResult } from '../common/dto/pagination.dto';
 import type { RequestUser } from '../common/types/request-user';
 import { CustomerQueryDto } from './dto/customer-query.dto';
 import { CustomerResponseDto } from './dto/customer-response.dto';
@@ -33,12 +35,12 @@ export class CustomersController {
 
   @Get()
   @ApiOperation({ summary: 'List customers for a business' })
-  @ApiOkResponse({ type: CustomerResponseDto, isArray: true })
+  @ApiPaginatedResponse(CustomerResponseDto)
   list(
     @CurrentUser() user: RequestUser,
     @Query() query: CustomerQueryDto,
-  ): Promise<Customer[]> {
-    return this.customersService.list(user.id, query.businessId);
+  ): Promise<PaginatedResult<Customer>> {
+    return this.customersService.list(user.id, query);
   }
 
   @Get(':id')

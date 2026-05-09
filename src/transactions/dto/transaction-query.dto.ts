@@ -1,8 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { TransactionStatus, TransactionType } from '@prisma/client';
 import { IsEnum, IsISO8601, IsOptional, IsUUID } from 'class-validator';
+import { CursorPaginationQueryDto } from '../../common/dto/pagination.dto';
 
-export class TransactionQueryDto {
+export class TransactionQueryDto extends CursorPaginationQueryDto {
   @ApiProperty()
   @IsUUID()
   businessId!: string;

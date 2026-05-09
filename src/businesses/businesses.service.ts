@@ -1,5 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { Business, BusinessRole, PlanCode } from '@prisma/client';
+import {
+  BillingInterval,
+  Business,
+  BusinessRole,
+  PlanCode,
+  SubscriptionStatus,
+} from '@prisma/client';
 import { TenancyService } from '../common/tenancy/tenancy.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../pricing/pricing.service';
@@ -46,6 +52,32 @@ export class BusinessesService {
           },
         },
       });
+      const plan = await tx.pricingPlan.findFirst({
+        where: {
+          code: pricing.pricingTier,
+          regionTier: pricing.pricingRegion,
+          billingInterval: BillingInterval.MONTHLY,
+          isActive: true,
+        },
+        select: { id: true },
+      });
+
+      if (plan) {
+        const now = new Date();
+        const renewalDate = new Date(now);
+        renewalDate.setUTCMonth(renewalDate.getUTCMonth() + 1);
+
+        await tx.subscription.create({
+          data: {
+            businessId: createdBusiness.id,
+            planId: plan.id,
+            status: SubscriptionStatus.TRIALING,
+            currentPeriodStart: now,
+            currentPeriodEnd: renewalDate,
+            renewalDate,
+          },
+        });
+      }
 
       await tx.activityLog.create({
         data: {

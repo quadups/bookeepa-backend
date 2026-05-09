@@ -60,6 +60,7 @@ npm run start:prod
 ### JWT Authentication
 - `JWT_SECRET` - Secret key for JWT signing (use a secure vault in production)
 - `JWT_EXPIRATION` - Token expiration time in seconds
+- `REFRESH_TOKEN_EXPIRATION_DAYS` - Mobile refresh token lifetime in days
 
 ### Logging
 - `LOG_LEVEL` - Log level (debug, info, warn, error)

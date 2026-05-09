@@ -6,7 +6,8 @@ Bookepa starts as simple bookkeeping for SMEs, but the backend is structured so 
 
 ## Runtime Shape
 
-- `main.ts` owns process bootstrap: API prefix, validation, CORS, Swagger, and server start.
+- `main.ts` owns process bootstrap: API version prefix, validation, CORS, Swagger, and server start.
+- `http-config.ts` centralizes `/api/v1` and shared HTTP setup so tests, OpenAPI export, and runtime stay aligned.
 - `AppModule` wires platform modules and global providers.
 - `ConfigModule` reads environment variables without spreading `process.env` across the codebase.
 - `PrismaModule` owns the Prisma lifecycle.
@@ -25,6 +26,7 @@ Each domain keeps its controller, service, and DTOs together:
 - `messages`
 - `dashboard`
 - `pricing`
+- `billing`
 
 Controllers should stay thin. They translate HTTP input into service calls and document the API contract. Services own business rules, tenant checks, database writes, and cross-entity validation.
 
@@ -45,7 +47,40 @@ All financial amounts use Prisma `Decimal` fields backed by PostgreSQL decimal c
 
 ## Auth
 
-The current implementation uses a small HMAC JWT service and Node's built-in `scrypt` password hashing so the repo does not depend on undeclared auth packages. If the project later adopts `@nestjs/jwt` or an external identity provider, keep the controller contract stable and swap the implementation behind `AuthService`.
+The current implementation uses a small HMAC JWT service and Node's built-in `scrypt` password hashing. Mobile sessions use opaque refresh tokens stored as hashes in `AuthSession`. Refresh tokens rotate on refresh and can be revoked through logout.
+
+## Mobile Readiness
+
+Mobile clients need stable contracts and retry-safe writes:
+
+- `/api/v1` is the first stable API namespace.
+- list endpoints use cursor pagination with `limit`, `cursor`, and `nextCursor`.
+- transaction creation accepts `Idempotency-Key` so retries do not duplicate records.
+- Prisma decimals and dates are serialized into JSON-safe strings.
+- `npm run openapi:generate` exports `openapi/bookepa-api.v1.json` for typed mobile client generation.
+
+## Billing Entitlements
+
+Plan enforcement is centralized in `billing`, not scattered through feature modules.
+
+Core concepts:
+
+- `Feature`: a capability the product can enable, disable, or limit.
+- `PricingPlan`: the commercial plan a business is on.
+- `PlanEntitlement`: the rule connecting a plan to a feature.
+- `Usage`: metered consumption for quota-backed features.
+
+Product modules should never check plan names directly. They should call:
+
+```ts
+await this.entitlementsService.assertWithinQuota(
+  businessId,
+  FEATURE_CODES.TRANSACTIONS,
+  1,
+);
+```
+
+This keeps plan changes data-driven. Adding a new plan limit should normally mean updating seed/admin data and calling the entitlement service from the relevant write path.
 
 ## Extension Points
 

@@ -1,11 +1,23 @@
+import 'dotenv/config';
+import { PrismaPg } from '@prisma/adapter-pg';
 import {
   BillingInterval,
   PlanCode,
   PrismaClient,
   PricingRegionTier,
 } from '@prisma/client';
+import { FEATURE_CATALOG } from '../src/billing/feature-codes';
+import { PLAN_ENTITLEMENTS } from '../src/billing/plan-entitlements';
 
-const prisma = new PrismaClient();
+const databaseUrl = process.env.DATABASE_URL;
+
+if (!databaseUrl) {
+  throw new Error('DATABASE_URL must be set before running prisma/seed.ts');
+}
+
+const prisma = new PrismaClient({
+  adapter: new PrismaPg({ connectionString: databaseUrl }),
+});
 
 const plans = [
   {
@@ -119,8 +131,19 @@ const countries = [
 ];
 
 async function main(): Promise<void> {
+  for (const feature of FEATURE_CATALOG) {
+    await prisma.feature.upsert({
+      where: { code: feature.code },
+      update: {
+        name: feature.name,
+        description: feature.description,
+      },
+      create: feature,
+    });
+  }
+
   for (const plan of plans) {
-    await prisma.pricingPlan.upsert({
+    const pricingPlan = await prisma.pricingPlan.upsert({
       where: {
         code_regionTier_billingInterval: {
           code: plan.code,
@@ -149,6 +172,31 @@ async function main(): Promise<void> {
         ],
       },
     });
+
+    for (const entitlement of Object.values(PLAN_ENTITLEMENTS[plan.code])) {
+      await prisma.planEntitlement.upsert({
+        where: {
+          planId_featureCode: {
+            planId: pricingPlan.id,
+            featureCode: entitlement.featureCode,
+          },
+        },
+        update: {
+          enabled: entitlement.enabled,
+          limit: entitlement.limit,
+          period: entitlement.period,
+          enforcement: entitlement.enforcement,
+        },
+        create: {
+          planId: pricingPlan.id,
+          featureCode: entitlement.featureCode,
+          enabled: entitlement.enabled,
+          limit: entitlement.limit,
+          period: entitlement.period,
+          enforcement: entitlement.enforcement,
+        },
+      });
+    }
   }
 
   for (const country of countries) {

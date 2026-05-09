@@ -21,6 +21,12 @@ export class AuthResponseDto {
   @ApiProperty()
   accessToken!: string;
 
+  @ApiProperty({
+    description:
+      'Long-lived opaque refresh token. Store securely on mobile devices.',
+  })
+  refreshToken!: string;
+
   @ApiProperty({ type: AuthUserDto })
   user!: AuthUserDto;
 }

@@ -1,5 +1,12 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Invoice, InvoiceItem, Prisma } from '@prisma/client';
+import {
+  PaginatedResult,
+  resolvePageLimit,
+  toPaginatedResult,
+} from '../common/dto/pagination.dto';
+import { EntitlementsService } from '../billing/entitlements.service';
+import { FEATURE_CODES } from '../billing/feature-codes';
 import { TenancyService } from '../common/tenancy/tenancy.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateInvoiceDto, CreateInvoiceItemDto } from './dto/create-invoice.dto';
@@ -13,6 +20,7 @@ export class InvoicesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tenancyService: TenancyService,
+    private readonly entitlementsService: EntitlementsService,
   ) {}
 
   async create(userId: string, dto: CreateInvoiceDto): Promise<InvoiceWithItems> {
@@ -22,6 +30,11 @@ export class InvoicesService {
     );
 
     await this.assertCustomerBelongsToBusiness(dto.businessId, dto.customerId);
+    await this.entitlementsService.assertWithinQuota(
+      dto.businessId,
+      FEATURE_CODES.INVOICES,
+      1,
+    );
 
     const invoiceItems = dto.items.map((item) => this.prepareItem(item));
     const totalAmount = invoiceItems.reduce(
@@ -30,7 +43,7 @@ export class InvoicesService {
     );
     const invoiceNumber = await this.generateInvoiceNumber(dto.businessId);
 
-    return this.prisma.invoice.create({
+    const invoice = await this.prisma.invoice.create({
       data: {
         businessId: dto.businessId,
         customerId: dto.customerId,
@@ -53,20 +66,37 @@ export class InvoicesService {
       },
       include: { items: true },
     });
+
+    await this.entitlementsService.recordUsage(
+      dto.businessId,
+      FEATURE_CODES.INVOICES,
+      1,
+    );
+
+    return invoice;
   }
 
-  async list(userId: string, query: InvoiceQueryDto): Promise<InvoiceWithItems[]> {
+  async list(
+    userId: string,
+    query: InvoiceQueryDto,
+  ): Promise<PaginatedResult<InvoiceWithItems>> {
     await this.tenancyService.assertBusinessMember(userId, query.businessId);
+    const limit = resolvePageLimit(query.limit);
 
-    return this.prisma.invoice.findMany({
+    const invoices = await this.prisma.invoice.findMany({
       where: {
         businessId: query.businessId,
         status: query.status,
         isDeleted: false,
       },
       include: { items: true },
-      orderBy: { issuedDate: 'desc' },
+      orderBy: [{ issuedDate: 'desc' }, { id: 'desc' }],
+      cursor: query.cursor ? { id: query.cursor } : undefined,
+      skip: query.cursor ? 1 : 0,
+      take: limit + 1,
     });
+
+    return toPaginatedResult(invoices, limit);
   }
 
   async get(userId: string, invoiceId: string): Promise<InvoiceWithItems> {

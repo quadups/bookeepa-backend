@@ -42,6 +42,16 @@ export class AppConfigService {
     );
   }
 
+  get databaseUrl(): string {
+    const url = this.getOptional('DATABASE_URL');
+
+    if (!url) {
+      throw new Error('DATABASE_URL must be set.');
+    }
+
+    return url;
+  }
+
   get jwtSecret(): string {
     const fallback = 'local-development-secret-change-me';
     const secret = this.getOptional('JWT_SECRET') ?? fallback;
@@ -59,6 +69,10 @@ export class AppConfigService {
 
   get jwtExpiresInSeconds(): number {
     return this.getNumber('JWT_EXPIRATION', 3600);
+  }
+
+  get refreshTokenExpiresInDays(): number {
+    return this.getNumber('REFRESH_TOKEN_EXPIRATION_DAYS', 30);
   }
 
   private getNumber(key: string, fallback: number): number {

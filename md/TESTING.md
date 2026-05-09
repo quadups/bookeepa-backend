@@ -17,6 +17,10 @@ Prioritize business rules and security boundaries:
 - password hashing and token verification
 - pricing resolution and fallbacks
 - tenant access checks
+- cursor pagination helpers
+- response serialization for Decimal and Date values
+- idempotency key replay and conflict behavior
+- entitlement resolution, quota allowance, and quota blocking
 - transaction currency enforcement
 - invoice total calculation
 - message reference validation
